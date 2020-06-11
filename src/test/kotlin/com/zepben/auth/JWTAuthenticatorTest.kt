@@ -33,10 +33,10 @@ class JWTAuthenticatorTest {
         var authResp = ta.authenticate(TOKEN)
         assertThat(authResp.statusCode, equalTo(StatusCode.OK))
         val successfulToken = authResp.token!!
-        authResp = JWTAuthoriser.authorise(successfulToken, "write:network")
+        authResp = authorise(successfulToken, "write:network")
         assertThat(authResp.statusCode, equalTo(StatusCode.OK))
 
-        authResp = JWTAuthoriser.authorise(successfulToken, "bacon")
+        authResp = authorise(successfulToken, "bacon")
         assertThat(authResp.statusCode, equalTo(StatusCode.UNAUTHENTICATED))
         assertThat(authResp.message, equalTo("Token was missing required claim bacon"))
 
