@@ -25,9 +25,6 @@ import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.*
 import com.auth0.jwt.interfaces.DecodedJWT
 import io.vertx.ext.web.handler.impl.HttpStatusException
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
 import java.security.interfaces.RSAPublicKey
 
 const val WELL_KNOWN_JWKS_PATH = "/.well-known/jwks.json"
@@ -68,16 +65,16 @@ interface TokenAuthenticator {
  * A TokenAuthenticator that authenticates JWTs using a retrievable JWK
  *
  * @property audience The audience required for the token to be authenticated.
- * @property jwksDomain The domain hosting the JWKS.
+ * @property issuerDomain The domain hosting the JWKS.
  * @property jwkProvider An [UrlJwkProvider] for fetching the JWK used for authenticating JWTs.
- * @property issuer The Issuer required for the token to be authenticated. Typically is the same as [jwksDomain]. Will
+ * @property issuer The Issuer required for the token to be authenticated. Typically is the same as [issuerDomain]. Will
  *                  default to https://<[jwksDomain]>/.
  */
 open class JWTAuthenticator(
     private val audience: String,
-    private val jwksDomain: String,
-    private val jwkProvider: UrlJwkProvider = UrlJwkProvider(jwksDomain),
-    private val issuer: String = "https://${jwksDomain}/"
+    private val issuerDomain: String,
+    private val jwkProvider: UrlJwkProvider = UrlJwkProvider(issuerDomain),
+    private val issuer: String = "https://${issuerDomain}/"
 ): TokenAuthenticator {
     private var keys: Map<String, Jwk> = refreshJwk()
 
@@ -86,7 +83,7 @@ open class JWTAuthenticator(
     private fun getKeyFromJwk(kid: String): Jwk =
         keys[kid] ?: run {
             refreshJwk()
-            keys[kid] ?: throw JwkException("Unable to find key $kid in ${jwksDomain}$WELL_KNOWN_JWKS_PATH")
+            keys[kid] ?: throw JwkException("Unable to find key $kid in ${issuerDomain}$WELL_KNOWN_JWKS_PATH")
         }
 
     override fun authenticate(token: String?): AuthResponse =

@@ -58,8 +58,7 @@ class AuthRoute {
                             .addHandler(
                                 Auth0AuthHandler(
                                     JWTAuthProvider(JWTAuthenticator(audience, issuer)),
-                                    mutableSetOf<String>().apply { addAll(requiredClaims) },
-                                    Type.BEARER
+                                    mutableSetOf<String>().apply { addAll(requiredClaims) }
                                 )
                             )
                             .build()

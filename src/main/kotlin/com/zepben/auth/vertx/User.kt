@@ -32,8 +32,6 @@ import io.vertx.ext.auth.AuthProvider
 
 /**
  *
- *
- * @author [Stephane Bastian](mail://stephane.bastian.dev@gmail.com)
  */
 class User(private val jwt: DecodedJWT) : AbstractUser(), ClusterSerializable {
 
@@ -48,7 +46,6 @@ class User(private val jwt: DecodedJWT) : AbstractUser(), ClusterSerializable {
             resultHandler.handle(Future.succeededFuture(true))
         else {
             resultHandler.handle(Future.succeededFuture(false))
-            resultHandler.handle(Future.failedFuture(resp.asHttpException()))
         }
     }
 

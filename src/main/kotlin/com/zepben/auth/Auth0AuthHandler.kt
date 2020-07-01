@@ -22,26 +22,24 @@ import io.vertx.core.AsyncResult
 import io.vertx.core.Future
 import io.vertx.core.Handler
 import io.vertx.core.http.HttpHeaders
+import io.vertx.core.http.HttpMethod
 import io.vertx.core.json.JsonObject
+import io.vertx.ext.auth.User
 import io.vertx.ext.web.RoutingContext
-import io.vertx.ext.web.handler.impl.AuthHandlerImpl
+import io.vertx.ext.web.handler.AuthHandler
 import io.vertx.ext.web.handler.impl.HttpStatusException
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
-enum class Type(private val label: String) {
-    BASIC("Basic"), DIGEST("Digest"), BEARER("Bearer"),  // these have no known implementation
-    HOBA("HOBA"), MUTUAL("Mutual"), NEGOTIATE("Negotiate"), OAUTH("OAuth"), SCRAM_SHA_1("SCRAM-SHA-1"), SCRAM_SHA_256("SCRAM-SHA-256");
 
-    fun labelIs(other: String?): Boolean {
-        return label.equals(other, ignoreCase = true)
-    }
+class Auth0AuthHandler(
+    val authProvider: JWTAuthProvider,
+    requiredClaims: Set<String>,
+    private val skip: String? = null
+) :
+    AuthHandler {
 
-}
-
-class Auth0AuthHandler(authProvider: JWTAuthProvider,
-                       requiredClaims: Set<String>,
-                       private val type: Type,
-                       private val skip: String? = null) :
-    AuthHandlerImpl(authProvider) {
+    private val authorities = mutableSetOf<String>()
 
     init {
         addAuthorities(requiredClaims)
@@ -53,6 +51,167 @@ class Auth0AuthHandler(authProvider: JWTAuthProvider,
 
         @JvmStatic
         val BAD_REQUEST = HttpStatusException(400)
+
+        @JvmStatic
+        val FORBIDDEN = HttpStatusException(403)
+    }
+
+    override fun addAuthority(authority: String): AuthHandler {
+        authorities.add(authority)
+        return this
+    }
+
+    override fun addAuthorities(authorities: Set<String>): AuthHandler {
+        this.authorities.addAll(authorities)
+        return this
+    }
+
+    override fun authorize(user: User?, handler: Handler<AsyncResult<Void?>>) {
+        val requiredCount = authorities.size
+        if (requiredCount > 0) {
+            if (user == null) {
+                handler.handle(Future.failedFuture(FORBIDDEN))
+                return
+            }
+            val count = AtomicInteger()
+            val sentFailure = AtomicBoolean()
+            val authHandler =
+                Handler { res: AsyncResult<Boolean> ->
+                    if (res.succeeded()) {
+                        if (res.result()) {
+                            if (count.incrementAndGet() == requiredCount) {
+                                // Has all required authorities
+                                handler.handle(Future.succeededFuture())
+                            }
+                        } else {
+                            if (sentFailure.compareAndSet(false, true)) {
+                                handler.handle(Future.failedFuture(FORBIDDEN))
+                            }
+                        }
+                    } else {
+                        handler.handle(Future.failedFuture(res.cause()))
+                    }
+                }
+            for (authority in authorities) {
+                if (!sentFailure.get()) {
+                    user.isAuthorized(authority, authHandler)
+                }
+            }
+        } else {
+            // No auth required
+            handler.handle(Future.succeededFuture())
+        }
+    }
+
+    override fun handle(ctx: RoutingContext) {
+        if (handlePreflight(ctx)) {
+            return
+        }
+        val user = ctx.user()
+        if (user != null) {
+            // proceed to AuthZ
+            authorizeUser(ctx, user)
+            return
+        }
+        // parse the request in order to extract the credentials object
+        parseCredentials(ctx) { res: AsyncResult<JsonObject> ->
+            if (res.failed()) {
+                processException(ctx, res.cause())
+                return@parseCredentials
+            }
+            // check if the user has been set
+            val updatedUser = ctx.user()
+            if (updatedUser != null) {
+                val session = ctx.session()
+                session?.regenerateId()
+                // proceed to AuthZ
+                authorizeUser(ctx, updatedUser)
+                return@parseCredentials
+            }
+
+            // proceed to authN
+            authProvider.authenticate(
+                res.result()
+            ) { authN: AsyncResult<User> ->
+                if (authN.succeeded()) {
+                    val authenticated = authN.result()
+                    ctx.setUser(authenticated)
+                    val session = ctx.session()
+                    session?.regenerateId()
+                    // proceed to AuthZ
+                    authorizeUser(ctx, authenticated)
+                } else {
+                    // to allow further processing if needed
+                    if (authN.cause() is HttpStatusException) {
+                        processException(ctx, authN.cause())
+                    } else {
+                        processException(ctx, HttpStatusException(401, authN.cause()))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun processException(ctx: RoutingContext, exception: Throwable?) {
+        if (exception != null) {
+            if (exception is HttpStatusException) {
+                val statusCode = exception.statusCode
+                val payload = exception.payload
+                when (statusCode) {
+                    302 -> {
+                        ctx.response()
+                            .putHeader(HttpHeaders.LOCATION, payload)
+                            .setStatusCode(302)
+                            .end("Redirecting to $payload.")
+                        return
+                    }
+                    401 -> {
+                        ctx.fail(401, exception)
+                        return
+                    }
+                    else -> {
+                        ctx.fail(statusCode, exception)
+                        return
+                    }
+                }
+            }
+        }
+
+        // fallback 500
+        ctx.fail(exception)
+    }
+
+    private fun authorizeUser(ctx: RoutingContext, user: User) {
+        authorize(user) { authZ ->
+            if (authZ.failed()) {
+                processException(ctx, authZ.cause())
+                return@authorize
+            }
+            // success, allowed to continue
+            ctx.next()
+        }
+    }
+
+    private fun handlePreflight(ctx: RoutingContext): Boolean {
+        val request = ctx.request()
+        // See: https://www.w3.org/TR/cors/#cross-origin-request-with-preflight-0
+        // Preflight requests should not be subject to security due to the reason UAs will remove the Authorization header
+        if (request.method() == HttpMethod.OPTIONS) {
+            // check if there is a access control request header
+            val accessControlRequestHeader =
+                ctx.request().getHeader(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS)
+            if (accessControlRequestHeader != null) {
+                // lookup for the Authorization header
+                for (ctrlReq in accessControlRequestHeader.split(",".toRegex()).toTypedArray()) {
+                    if (ctrlReq.equals("Authorization", ignoreCase = true)) {
+                        // this request has auth in access control, so we can allow preflighs without authentication
+                        ctx.next()
+                        return true
+                    }
+                }
+            }
+        }
+        return false
     }
 
     private fun parseAuthorization(
@@ -60,7 +219,13 @@ class Auth0AuthHandler(authProvider: JWTAuthProvider,
         handler: Handler<AsyncResult<String?>>
     ) {
         val request = ctx.request()
-        val authorization = request.headers()[HttpHeaders.AUTHORIZATION] ?: run { handler.handle(Future.failedFuture(UNAUTHORIZED)); return }
+        val authorization = request.headers()[HttpHeaders.AUTHORIZATION] ?: run {
+            handler.handle(
+                Future.failedFuture(
+                    UNAUTHORIZED
+                )
+            ); return
+        }
 
         try {
             val idx = authorization.indexOf(' ')
@@ -68,7 +233,7 @@ class Auth0AuthHandler(authProvider: JWTAuthProvider,
                 handler.handle(Future.failedFuture(BAD_REQUEST))
                 return
             }
-            if (!type.labelIs(authorization.substring(0, idx))) {
+            if (authorization.substring(0, idx) != "Bearer") {
                 handler.handle(Future.failedFuture(UNAUTHORIZED))
                 return
             }
@@ -99,6 +264,8 @@ class Auth0AuthHandler(authProvider: JWTAuthProvider,
                 )
             }
         )
+//        context.response().end() TODO: this must not occur on some endpoints. needs to occur if auth fails. maybe we are not
+        // failing fast if authN/Z fails? need to make sure permissions are in the web client scope too - token is missing them.
     }
 
 }
