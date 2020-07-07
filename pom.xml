@@ -15,7 +15,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jacoco.coverage>0.8</jacoco.coverage>
+        <jacoco.coverage>0.3</jacoco.coverage>
         <ewb.grpc.version>1.0.0-SNAPSHOT</ewb.grpc.version>
     </properties>
 
