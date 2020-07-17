@@ -55,7 +55,7 @@ data class AuthResponse(
 class AuthException(val code: Int, message: String? = null): Exception(message)
 
 fun AuthResponse.asException(): AuthException = AuthException(statusCode.code, message)
-fun AuthResponse.asHttpException(): HttpStatusException = HttpStatusException(statusCode.code)
+fun AuthResponse.asHttpException(): HttpStatusException = HttpStatusException(statusCode.code, message)
 
 interface TokenAuthenticator {
     fun authenticate(token: String?): AuthResponse
