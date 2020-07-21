@@ -52,7 +52,7 @@ class AuthRoute {
                 when (availableRoute) {
                     AvailableRoute.AUTH ->
                         Route.builder()
-                            .method(HttpMethod.GET)
+                            .methods(*HttpMethod.values())
                             .path(path)
                             .hasRegexPath(isRegexPath)
                             .addHandler(

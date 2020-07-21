@@ -45,17 +45,6 @@ class Auth0AuthHandler(
         addAuthorities(requiredClaims)
     }
 
-    companion object {
-        @JvmStatic
-        val UNAUTHORIZED = HttpStatusException(401)
-
-        @JvmStatic
-        val BAD_REQUEST = HttpStatusException(400)
-
-        @JvmStatic
-        val FORBIDDEN = HttpStatusException(403)
-    }
-
     override fun addAuthority(authority: String): AuthHandler {
         authorities.add(authority)
         return this
@@ -70,7 +59,7 @@ class Auth0AuthHandler(
         val requiredCount = authorities.size
         if (requiredCount > 0) {
             if (user == null) {
-                handler.handle(Future.failedFuture(FORBIDDEN))
+                handler.handle(Future.failedFuture(HttpStatusException(403, "No user was found, you must authenticate first")))
                 return
             }
             val count = AtomicInteger()
@@ -85,7 +74,7 @@ class Auth0AuthHandler(
                             }
                         } else {
                             if (sentFailure.compareAndSet(false, true)) {
-                                handler.handle(Future.failedFuture(FORBIDDEN))
+                                handler.handle(Future.failedFuture(HttpStatusException(403, "Could not authorise all requested permissions. This is likely a bug.")))
                             }
                         }
                     } else {
@@ -141,7 +130,6 @@ class Auth0AuthHandler(
                     // proceed to AuthZ
                     authorizeUser(ctx, authenticated)
                 } else {
-                    // to allow further processing if needed
                     if (authN.cause() is HttpStatusException) {
                         processException(ctx, authN.cause())
                     } else {
@@ -165,12 +153,11 @@ class Auth0AuthHandler(
                             .end("Redirecting to $payload.")
                         return
                     }
-                    401 -> {
-                        ctx.fail(401, exception)
-                        return
-                    }
                     else -> {
-                        ctx.fail(statusCode, exception)
+                        ctx.response()
+                            .setStatusCode(exception.statusCode)
+                            .setStatusMessage(exception.message)
+                        payload?.let { ctx.response().end(payload) }
                         return
                     }
                 }
@@ -222,7 +209,7 @@ class Auth0AuthHandler(
         val authorization = request.headers()[HttpHeaders.AUTHORIZATION] ?: run {
             handler.handle(
                 Future.failedFuture(
-                    UNAUTHORIZED
+                    HttpStatusException(401, "Missing Authorization header")
                 )
             ); return
         }
@@ -230,11 +217,11 @@ class Auth0AuthHandler(
         try {
             val idx = authorization.indexOf(' ')
             if (idx <= 0) {
-                handler.handle(Future.failedFuture(BAD_REQUEST))
+                handler.handle(Future.failedFuture(HttpStatusException(400, "Badly formed Authorization header")))
                 return
             }
             if (authorization.substring(0, idx) != "Bearer") {
-                handler.handle(Future.failedFuture(UNAUTHORIZED))
+                handler.handle(Future.failedFuture(HttpStatusException(401, "Missing Bearer token from Authorization header")))
                 return
             }
             handler.handle(Future.succeededFuture(authorization.substring(idx + 1)))
