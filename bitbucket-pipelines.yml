@@ -1,132 +1,76 @@
-####################################################PIPELINE MENU####################################################
-# branch - master & pull requests:
-# * Runs build and tests.
-# * Deploys SNAPSHOT version to Zepben Maven repo.
-#
-# Tags:
-# * Builds source code and upload to Zepben Maven repo.
-#
-# release-then-incr-patch, release-then-incr-minor & release-then-incr-major:
-# * Only works on master and LTS/* branches.
-# * Remove SNAPSHOT from version and runs build and tests.
-# * Date stamp release date in Changelog.
-# * Tags the commit.
-# * Updates the version and add entry into Changelog depending on the selected semantic version.
-# * Tries to rebase master on top of the changes.
-# * release-then-incr-minor & release-then-incr-major only works for master branch or commits under master branch.
-# * Would not run pipeline when commit is part of the revisions in any tag.
-#
-# LTS:
-# * Specify major or major.minor version.
-# * Creates LTS/X.X.X branch, on the latest specified version.
-#
-# Images used: https://bitbucket.org/zepben/vm-container-images/
 #####################################################################################################################
-image: zepben/pipeline-java-amazoncorretto:4.0.0
+# Documentation: https://bitbucket.org/zepben/how-tos/src/master/bitbucket_pipelines/release-management.md
+# Custom Images used: https://bitbucket.org/zepben/vm-container-images/
+#####################################################################################################################
+image: zepben/pipeline-java
 
 options:
   max-time: 30
 
 definitions:
-  basic-image: &basic-image
-    image: zepben/pipeline-basic:1.3.0
+  zep-basic-image: &zep-basic-image
+    image: zepben/pipeline-basic:2.0.0
 
   steps:
-    - step: &run-tests-step
+    - step: &build-test-step
         name: Build and Test
         caches:
           - maven
         script:
-          - mvn-build pom.xml
-    - step: &deploy
-        name: Pack and Deploy SNAPSHOT lib to Maven repo
+          - mvn clean test -f pom.xml -Dserver.username=$NEXUS_USERNAME -Dserver.password=$NEXUS_PASSWORD -Dserver.repo.url=$NEXUS_MAVEN_REPO 
+    - step: &release-step
+        name: Package and Upload artifact
         caches:
           - maven
         script:
-          - mvn-release-lib --snapshot pom.xml
-    - step: &release-finalize-version
-        <<: *basic-image
-        name: Finalize release version
-        script:
-          - java-mvn-finalize-version pom.xml
-    - step: &release-rebase-master
-        <<: *basic-image
-        name: Rebase master
-        script:
-          - rebase
-    - step: &release-init
-        <<: *basic-image
-        name: Init
-    - step: &release-update-next-version
-        <<: *basic-image
-        name: Update project version to next snapshot
+          - mvn clean deploy -f pom.xml -Dserver.username=$NEXUS_USERNAME -Dserver.password=$NEXUS_PASSWORD -Dserver.repo.url=$NEXUS_MAVEN_REPO -Dserver.release.url=$NEXUS_MAVEN_RELEASE -Dserver.snapshot.url=$NEXUS_MAVEN_SNAPSHOT 
+          - export artifact=$(ls target/ | grep -o "^.*[0-9]\+\.[0-9]\+\.[0-9]\+\(\-SNAPSHOT\)\?\.jar")
+          - pipe: atlassian/slack-notify:0.3.6
+            variables:
+              WEBHOOK_URL: $SLACK_WEBHOOK
+              MESSAGE: "$artifact is available."
 
-  release-update-version-script: &release-update-version-script
-                                  java-mvn-update-version pom.xml
 pipelines:
   branches:
     master: 
-      - step: *run-tests-step
-      - step: *deploy
+      - step: *release-step
     LTS/*:
-      - step: *run-tests-step
-      - step: *deploy
+      - step: *release-step
+    hotfix/*:
+      - step: *release-step
   pull-requests:
     '**': 
-      - step: *run-tests-step
+      - step: *build-test-step
+
   tags:
     '*.*.*':
-      - step: 
-          name: Pack and Deploy lib to Maven repo
-          caches:
-            - maven
-          script:
-            - mvn-release-lib pom.xml
+      - step: *release-step
+
   custom:
-    release-then-incr-patch:
+    create-release:
       - step:
-          <<: *release-init
+          name: Create release
+          <<: *zep-basic-image
           script:
-            - export VERSION_TYPE=patch
-            - release-init
-      - step: *release-finalize-version
+            - release-checks
+            - java-mvn-finalize-version pom.xml
+            - java-mvn-update-version pom.xml
+            - rebase
+
+    create-LTS-branch:
       - step:
-          <<: *release-update-next-version
+          <<: *zep-basic-image
+          name: Create LTS branch
           script:
-            - export VERSION_TYPE=patch
-            - *release-update-version-script
-      - step: *release-rebase-master
-    release-then-incr-minor:
+            - create-branch --lts
+            - export BITBUCKET_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            - java-mvn-update-version pom.xml
+
+    create-hotfix-branch:
       - step:
-          <<: *release-init
+          <<: *zep-basic-image
+          name: Create Hotfix branch
           script:
-            - export VERSION_TYPE=minor
-            - release-init
-      - step: *release-finalize-version
-      - step:
-          <<: *release-update-next-version
-          script:
-            - export VERSION_TYPE=minor
-            - *release-update-version-script
-      - step: *release-rebase-master
-    release-then-incr-major:
-      - step:
-          <<: *release-init
-          script:
-            - export VERSION_TYPE=major
-            - release-init
-      - step: *release-finalize-version
-      - step:
-          <<: *release-update-next-version
-          script:
-            - export VERSION_TYPE=major
-            - *release-update-version-script
-      - step: *release-rebase-master
-    LTS:
-      - variables:
-          - name: version
-      - step:
-          <<: *basic-image
-          name: Create LTS support branch
-          script:
-            - create-lts $version
+            - create-branch --hotfix
+            - export BITBUCKET_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            - java-mvn-update-version pom.xml
