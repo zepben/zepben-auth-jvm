@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.zepben.maven</groupId>
         <artifactId>evolve-super-pom</artifactId>
-        <version>0.16.0</version>
+        <version>0.9.0</version>
     </parent>
 
     <groupId>com.zepben</groupId>
@@ -35,19 +35,11 @@
 
         <dependency>
             <groupId>com.zepben</groupId>
-            <artifactId>vertx-route-utils</artifactId>
-            <version>5.0.0</version>
+            <artifactId>vertx-utils</artifactId>
+            <version>1.2.0</version>
         </dependency>
 
         <!--Vert.x packages-->
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.vertx</groupId>
-            <artifactId>vertx-web</artifactId>
-        </dependency>
         <dependency>
             <groupId>io.vertx</groupId>
             <artifactId>vertx-rx-java2</artifactId>
