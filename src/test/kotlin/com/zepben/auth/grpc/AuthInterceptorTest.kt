@@ -18,10 +18,7 @@
 package com.zepben.auth.grpc
 
 import com.zepben.auth.JWTAuthenticator
-import com.zepben.test.util.auth.MockJwksUrlProvider
-import com.zepben.test.util.auth.MockServerCall
-import com.zepben.test.util.auth.MockServerCallHandler
-import com.zepben.test.util.auth.TOKEN
+import com.zepben.testutils.auth.*
 import io.grpc.Metadata
 import io.grpc.Status
 import org.hamcrest.MatcherAssert.assertThat

@@ -19,7 +19,7 @@ package com.zepben.auth
 
 import com.auth0.jwt.exceptions.*
 import com.zepben.auth.JWTAuthoriser.authorise
-import com.zepben.test.util.auth.*
+import com.zepben.testutils.auth.*
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.instanceOf
