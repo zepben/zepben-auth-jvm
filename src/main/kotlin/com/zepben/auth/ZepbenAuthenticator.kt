@@ -26,9 +26,8 @@ import java.net.http.HttpResponse
 import java.time.Instant
 import io.vertx.core.json.Json
 import io.vertx.core.json.JsonObject
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import java.net.URI
+import javax.net.ssl.SSLContext
 import kotlin.Exception
 
 /**
@@ -60,8 +59,6 @@ data class ZepbenAuthenticator(
     private val _refreshToken: String? = null
     private var _tokenExpiry: Instant = Instant.MIN
     private var _tokenType: String? = null
-
-    private val logger: Logger = LoggerFactory.getLogger(javaClass)
 
     init {
         tokenRequestData.put("audience", audience)
@@ -98,8 +95,9 @@ data class ZepbenAuthenticator(
     }
 
     private fun fetchTokenAuth0(useRefresh: Boolean = false) {
-        // TODO: Find out how to toggle certificate validation for HttpClient
-        val client = HttpClient.newBuilder().build()
+        val client = HttpClient.newBuilder()
+            .sslContext(if (verifyCertificate) SSLContext.getDefault() else SSLContextUtils.allTrustingSSLContext())
+            .build()
         val body = if (useRefresh) refreshRequestData.toString() else tokenRequestData.toString()
         val request = HttpRequest.newBuilder()
             .uri(URL(issuerProtocol, issuerDomain, tokenPath).toURI())
@@ -152,8 +150,9 @@ data class ZepbenAuthenticator(
         audienceField: String = "audience",
         issuerDomainField: String = "issuer"
     ): ZepbenAuthenticator? {
-        // TODO: Find out how to toggle certificate validation for HttpClient
-        val client = HttpClient.newBuilder().build()
+        val client = HttpClient.newBuilder()
+            .sslContext(if (verifyCertificate) SSLContext.getDefault() else SSLContextUtils.allTrustingSSLContext())
+            .build()
         val request = HttpRequest.newBuilder().uri(URI(confAddress)).GET().build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
         if (response.statusCode() == 200) {
@@ -176,6 +175,6 @@ data class ZepbenAuthenticator(
         } else {
             throw Exception("$confAddress responded with error: ${response.statusCode()} - ${response.body()}")
         }
-        return null;
+        return null
     }
 }
