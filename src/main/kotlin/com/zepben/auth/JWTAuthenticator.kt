@@ -31,28 +31,12 @@ const val WELL_KNOWN_JWKS_PATH = "/.well-known/jwks.json"
 const val AUTHORIZATION_HEADER = "Authorization"
 const val CONTENT_TYPE = "Content-Type"
 
-enum class StatusCode(val code: Int) {
-    // Successful
-    OK(200),
-    // Token was malformed
-    MALFORMED_TOKEN(400),
-    // Failed to authenticate
-    UNAUTHENTICATED(403),
-    // Failed to authenticate, token didn't have required claims
-    PERMISSION_DENIED(403),
-    // All other errors
-    UNKNOWN(500);
-
-}
-
 data class AuthResponse(
     val statusCode: StatusCode,
     val message: String? = null,
     val cause: Throwable? = null,
     val token: DecodedJWT? = null
 )
-
-class AuthException(val code: Int, message: String? = null): Exception(message)
 
 fun AuthResponse.asException(): AuthException = AuthException(statusCode.code, message)
 fun AuthResponse.asHttpException(): HttpStatusException = HttpStatusException(statusCode.code, message)

@@ -56,10 +56,10 @@ data class ZepbenAuthenticator(
     val refreshRequestData: JsonObject = JsonObject(),
     private val client: HttpClient = HttpClient.newBuilder()
         .sslContext(if (verifyCertificate) SSLContext.getDefault() else SSLContextUtils.allTrustingSSLContext())
-        .build()
+        .build(),
+    private var _refreshToken: String? = null
 ) {
     private var _accessToken: String? = null
-    private val _refreshToken: String? = null
     private var _tokenExpiry: Instant = Instant.MIN
     private var _tokenType: String? = null
 
@@ -107,20 +107,30 @@ data class ZepbenAuthenticator(
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
 
         if (response.statusCode() != StatusCode.OK.code) {
-            throw Exception("Token fetch failed, Error was: ${response.statusCode()} - ${response.body()}")
+            throw AuthException(
+                response.statusCode(),
+                "Token fetch failed, Error was: ${response.statusCode()} - ${response.body()}"
+            )
         }
 
         val data: JsonObject
         try {
             data = Json.decodeValue(response.body()) as JsonObject
         } catch (e: DecodeException) {
-            throw Exception("Response did not contain valid JSON - response was: ${response.body()}")
+            throw AuthException(
+                response.statusCode(),
+                "Response did not contain valid JSON - response was: ${response.body()}"
+            )
         } catch (e: ClassCastException) {
-            throw Exception("Response was not a JSON object - response was: ${response.body()}")
+            throw AuthException(
+                response.statusCode(),
+                "Response was not a JSON object - response was: ${response.body()}"
+            )
         }
 
         if (data.containsKey("error") or !data.containsKey("access_token")) {
-            throw Exception(
+            throw AuthException(
+                response.statusCode(),
                 (data.getString("error") ?: "Access Token absent in token response") + " - " +
                 (data.getString("error_description") ?: "Response was: $data")
             )
@@ -129,49 +139,66 @@ data class ZepbenAuthenticator(
         _tokenType = data.getString("token_type")
         _accessToken = data.getString("access_token")
         _tokenExpiry = JWT.decode(_accessToken)?.getClaim("exp")?.asDate()?.toInstant() ?: Instant.MIN
-    }
 
-    /**
-     * Helper method to fetch auth related configuration from `confAddress` and create a `ZepbenAuthenticator`
-     *
-     * @param confAddress Location to retrieve authentication configuration from. Must be a HTTP address that returns a JSON response.
-     * @param verifyCertificate: Whether to verify the certificate when making HTTPS requests. Note you should only use a trusted server
-     *                           and never set this to False in a production environment.
-     * @param authTypeField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
-     * @param audienceField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
-     * @param issuerDomainField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
-     *
-     * @returns: A `ZepbenAuthenticator` if the server reported authentication was configured, otherwise None.
-     */
-    fun createAuthenticator(
-        confAddress: String,
-        verifyCertificate: Boolean = true,
-        authTypeField: String = "authType",
-        audienceField: String = "audience",
-        issuerDomainField: String = "issuer"
-    ): ZepbenAuthenticator? {
-        val request = HttpRequest.newBuilder().uri(URI(confAddress)).GET().build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() == StatusCode.OK.code) {
-            try {
-                val authConfigJson = Json.decodeValue(response.body()) as JsonObject
-                val authMethod = AuthMethod.valueOf(authConfigJson.getString(authTypeField))
-                if (authMethod != AuthMethod.NONE) {
-                    return ZepbenAuthenticator(
-                        authConfigJson.getString(audienceField),
-                        authConfigJson.getString(issuerDomainField),
-                        authMethod,
-                        verifyCertificate
-                    )
-                }
-            } catch (e: DecodeException) {
-                throw Exception("Response did not contain valid JSON - response was: ${response.body()}")
-            } catch (e: ClassCastException) {
-                throw Exception("Response was not a JSON object - response was: ${response.body()}")
-            }
-        } else {
-            throw Exception("$confAddress responded with error: ${response.statusCode()} - ${response.body()}")
+        if (useRefresh) {
+            _refreshToken = data.getString("refresh_token")
         }
-        return null
     }
+}
+
+
+/**
+ * Helper method to fetch auth related configuration from `confAddress` and create a `ZepbenAuthenticator`
+ *
+ * @param confAddress Location to retrieve authentication configuration from. Must be a HTTP address that returns a JSON response.
+ * @param verifyCertificate: Whether to verify the certificate when making HTTPS requests. Note you should only use a trusted server
+ *                           and never set this to False in a production environment.
+ * @param authTypeField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
+ * @param audienceField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
+ * @param issuerDomainField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
+ *
+ * @returns: A `ZepbenAuthenticator` if the server reported authentication was configured, otherwise None.
+ */
+fun createAuthenticator(
+    confAddress: String,
+    verifyCertificate: Boolean = true,
+    authTypeField: String = "authType",
+    audienceField: String = "audience",
+    issuerDomainField: String = "issuer",
+    client: HttpClient = HttpClient.newBuilder()
+        .sslContext(if (verifyCertificate) SSLContext.getDefault() else SSLContextUtils.allTrustingSSLContext())
+        .build()
+): ZepbenAuthenticator? {
+    val request = HttpRequest.newBuilder().uri(URI(confAddress)).GET().build()
+    val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+    if (response.statusCode() == StatusCode.OK.code) {
+        try {
+            val authConfigJson = Json.decodeValue(response.body()) as JsonObject
+            val authMethod = AuthMethod.valueOf(authConfigJson.getString(authTypeField))
+            if (authMethod != AuthMethod.NONE) {
+                return ZepbenAuthenticator(
+                    authConfigJson.getString(audienceField),
+                    authConfigJson.getString(issuerDomainField),
+                    authMethod,
+                    verifyCertificate
+                )
+            }
+        } catch (e: DecodeException) {
+            throw AuthException(
+                response.statusCode(),
+                "Expected JSON response from $confAddress, but got: ${response.body()}."
+            )
+        } catch (e: ClassCastException) {
+            throw AuthException(
+                response.statusCode(),
+                "Expected JSON object from $confAddress, but got: ${response.body()}."
+            )
+        }
+    } else {
+        throw AuthException(
+            response.statusCode(),
+            "$confAddress responded with error: ${response.statusCode()} - ${response.body()}"
+        )
+    }
+    return null
 }
