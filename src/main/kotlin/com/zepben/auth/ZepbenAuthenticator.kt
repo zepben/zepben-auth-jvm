@@ -53,7 +53,10 @@ data class ZepbenAuthenticator(
     // TODO: This isn't even used in the Python version, and it seems an algorithm isn't necessary to decode a JWT.
     val algorithm: String = "RS256",
     val tokenRequestData: JsonObject = JsonObject(),
-    val refreshRequestData: JsonObject = JsonObject()
+    val refreshRequestData: JsonObject = JsonObject(),
+    private val client: HttpClient = HttpClient.newBuilder()
+        .sslContext(if (verifyCertificate) SSLContext.getDefault() else SSLContextUtils.allTrustingSSLContext())
+        .build()
 ) {
     private var _accessToken: String? = null
     private val _refreshToken: String? = null
@@ -95,9 +98,6 @@ data class ZepbenAuthenticator(
     }
 
     private fun fetchTokenAuth0(useRefresh: Boolean = false) {
-        val client = HttpClient.newBuilder()
-            .sslContext(if (verifyCertificate) SSLContext.getDefault() else SSLContextUtils.allTrustingSSLContext())
-            .build()
         val body = if (useRefresh) refreshRequestData.toString() else tokenRequestData.toString()
         val request = HttpRequest.newBuilder()
             .uri(URL(issuerProtocol, issuerDomain, tokenPath).toURI())
@@ -106,7 +106,7 @@ data class ZepbenAuthenticator(
             .build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
 
-        if (response.statusCode() != 200) {
+        if (response.statusCode() != StatusCode.OK.code) {
             throw Exception("Token fetch failed, Error was: ${response.statusCode()} - ${response.body()}")
         }
 
@@ -150,12 +150,9 @@ data class ZepbenAuthenticator(
         audienceField: String = "audience",
         issuerDomainField: String = "issuer"
     ): ZepbenAuthenticator? {
-        val client = HttpClient.newBuilder()
-            .sslContext(if (verifyCertificate) SSLContext.getDefault() else SSLContextUtils.allTrustingSSLContext())
-            .build()
         val request = HttpRequest.newBuilder().uri(URI(confAddress)).GET().build()
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() == 200) {
+        if (response.statusCode() == StatusCode.OK.code) {
             try {
                 val authConfigJson = Json.decodeValue(response.body()) as JsonObject
                 val authMethod = AuthMethod.valueOf(authConfigJson.getString(authTypeField))
