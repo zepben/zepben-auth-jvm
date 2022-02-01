@@ -15,9 +15,12 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth.vertx
+package com.zepben.auth.server.vertx
 
 import com.zepben.auth.*
+import com.zepben.auth.common.StatusCode
+import com.zepben.auth.server.TokenAuthenticator
+import com.zepben.auth.server.asHttpException
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
 import io.vertx.core.Handler

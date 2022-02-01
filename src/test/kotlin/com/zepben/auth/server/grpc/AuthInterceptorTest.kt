@@ -15,9 +15,9 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth.grpc
+package com.zepben.auth.server.grpc
 
-import com.zepben.auth.JWTAuthenticator
+import com.zepben.auth.server.JWTAuthenticator
 import com.zepben.testutils.auth.*
 import io.grpc.Metadata
 import io.grpc.Status

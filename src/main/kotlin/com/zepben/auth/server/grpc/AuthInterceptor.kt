@@ -15,10 +15,13 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth.grpc
+package com.zepben.auth.server.grpc
 
 import com.auth0.jwt.interfaces.DecodedJWT
-import com.zepben.auth.*
+import com.zepben.auth.common.StatusCode
+import com.zepben.auth.server.AuthResponse
+import com.zepben.auth.server.JWTAuthoriser
+import com.zepben.auth.server.TokenAuthenticator
 import io.grpc.*
 import io.grpc.Metadata.ASCII_STRING_MARSHALLER
 

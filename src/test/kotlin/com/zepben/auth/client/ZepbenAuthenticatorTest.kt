@@ -1,5 +1,8 @@
-package com.zepben.auth
+package com.zepben.auth.client
 
+import com.zepben.auth.common.AuthException
+import com.zepben.auth.common.AuthMethod
+import com.zepben.auth.common.StatusCode
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.AfterEach
 

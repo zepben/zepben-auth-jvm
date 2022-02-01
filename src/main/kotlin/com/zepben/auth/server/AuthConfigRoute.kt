@@ -15,7 +15,7 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.server
 
 import com.zepben.vertxutils.routing.Respond
 import com.zepben.vertxutils.routing.Route

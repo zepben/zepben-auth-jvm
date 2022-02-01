@@ -15,10 +15,11 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.server
 
 import com.auth0.jwt.exceptions.*
-import com.zepben.auth.JWTAuthoriser.authorise
+import com.zepben.auth.server.JWTAuthoriser.authorise
+import com.zepben.auth.common.StatusCode
 import com.zepben.testutils.auth.*
 import org.hamcrest.MatcherAssert.assertThat
 import org.hamcrest.Matchers.equalTo

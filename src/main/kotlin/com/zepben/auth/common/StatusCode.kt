@@ -1,4 +1,4 @@
-package com.zepben.auth
+package com.zepben.auth.common
 
 enum class StatusCode(val code: Int) {
     // Successful

@@ -15,7 +15,7 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.server
 
 import com.auth0.jwk.Jwk
 import com.auth0.jwk.JwkException
@@ -24,6 +24,8 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.exceptions.*
 import com.auth0.jwt.interfaces.DecodedJWT
+import com.zepben.auth.common.AuthException
+import com.zepben.auth.common.StatusCode
 import io.vertx.ext.web.handler.impl.HttpStatusException
 import java.security.interfaces.RSAPublicKey
 

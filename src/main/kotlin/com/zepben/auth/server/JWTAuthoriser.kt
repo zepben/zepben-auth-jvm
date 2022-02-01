@@ -15,9 +15,10 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.server
 
 import com.auth0.jwt.interfaces.DecodedJWT
+import com.zepben.auth.common.StatusCode
 
 object JWTAuthoriser {
     @JvmStatic

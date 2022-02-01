@@ -15,7 +15,7 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.common
 
 /**
  * An enum class that represents the different authentication methods that could be returned from the server's

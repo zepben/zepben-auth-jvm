@@ -15,7 +15,7 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.client
 
 import java.security.SecureRandom
 import java.security.cert.X509Certificate

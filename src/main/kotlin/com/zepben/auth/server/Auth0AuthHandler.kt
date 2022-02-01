@@ -15,9 +15,9 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.server
 
-import com.zepben.auth.vertx.JWTAuthProvider
+import com.zepben.auth.server.vertx.JWTAuthProvider
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
 import io.vertx.core.Handler

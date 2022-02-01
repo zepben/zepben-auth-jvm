@@ -15,12 +15,11 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth.vertx
+package com.zepben.auth.server.vertx
 
 import com.auth0.jwt.interfaces.DecodedJWT
-import com.zepben.auth.StatusCode
-import com.zepben.auth.JWTAuthoriser
-import com.zepben.auth.asHttpException
+import com.zepben.auth.common.StatusCode
+import com.zepben.auth.server.JWTAuthoriser
 import io.vertx.core.AsyncResult
 import io.vertx.core.Future
 import io.vertx.core.Handler

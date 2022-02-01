@@ -15,9 +15,12 @@
 // along with zepben-auth.  If not, see <https://www.gnu.org/licenses/>.
 
 
-package com.zepben.auth
+package com.zepben.auth.client
 
 import com.auth0.jwt.JWT
+import com.zepben.auth.common.AuthException
+import com.zepben.auth.common.AuthMethod
+import com.zepben.auth.common.StatusCode
 import io.vertx.core.json.DecodeException
 import java.net.URL
 import java.net.http.HttpClient
