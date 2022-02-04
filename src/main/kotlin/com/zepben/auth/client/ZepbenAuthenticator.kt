@@ -53,8 +53,6 @@ data class ZepbenAuthenticator(
     val verifyCertificate: Boolean = false,
     val issuerProtocol: String = "https",
     val tokenPath: String = "/oauth/token",
-    // TODO: This isn't even used in the Python version, and it seems an algorithm isn't necessary to decode a JWT.
-    val algorithm: String = "RS256",
     val tokenRequestData: JsonObject = JsonObject(),
     val refreshRequestData: JsonObject = JsonObject(),
     private val client: HttpClient = HttpClient.newBuilder()
@@ -141,7 +139,7 @@ data class ZepbenAuthenticator(
 
         _tokenType = data.getString("token_type")
         _accessToken = data.getString("access_token")
-        _tokenExpiry = JWT.decode(_accessToken)?.getClaim("exp")?.asDate()?.toInstant() ?: Instant.MIN
+        _tokenExpiry = JWT.decode(_accessToken).getClaim("exp")?.asDate()?.toInstant() ?: Instant.MIN
 
         if (useRefresh) {
             _refreshToken = data.getString("refresh_token")
@@ -159,6 +157,7 @@ data class ZepbenAuthenticator(
  * @param authTypeField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
  * @param audienceField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
  * @param issuerDomainField The field name to look up in the JSON response from the confAddress for `authenticator.authMethod`.
+ * @param client HTTP client used to retrieve authentication configuration. Generated from `verifyCertificate` by default.
  *
  * @returns: A `ZepbenAuthenticator` if the server reported authentication was configured, otherwise None.
  */

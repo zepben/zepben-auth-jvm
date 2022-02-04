@@ -83,7 +83,12 @@ open class JWTAuthenticator(
                 val rsaAlg = Algorithm.RSA256(rsaKey.publicKey as RSAPublicKey?, null)
 
                 // verify token signature
-                val verifier = JWT.require(rsaAlg).withAudience(audience).withIssuer(issuer).build()
+                val verifier = JWT
+                    .require(rsaAlg)
+                    .withAudience(audience)
+                    .withIssuer(issuer)
+                    .acceptLeeway(60 * 1000) // Extend valid window by 60 seconds in both directions
+                    .build()
                 verifier.verify(decoded)
 
                 AuthResponse(StatusCode.OK, token = decoded)
