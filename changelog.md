@@ -13,7 +13,7 @@
 * None.
 
 ##### Fixes
-* None.
+* Add 60 second leeway to JWT authentication
 
 ##### Notes
 * None.
